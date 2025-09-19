@@ -22,21 +22,21 @@
                     <i class="fas fa-tachometer-alt"></i>
                     Dashboard
                 </a>
-                <a href="#" class="nav-item">
+                <a href="{{ route('user.jadwal-belajar') }}" class="nav-item">
                     <i class="fas fa-calendar-alt"></i>
                     Jadwal Belajar
                 </a>
-                <a href="#" class="nav-item">
+                <a href="{{ route('user.request-materi') }}" class="nav-item">
                     <i class="fas fa-file-circle-plus"></i>
                     Request Materi
                 </a>
-                <a href="#" class="nav-item">
+                <a href="{{ route('user.perpustakaan') }}" class="nav-item">
                     <i class="fas fa-book"></i>
                     Perpustakaan
                 </a>
-                <a href="#" class="nav-item">
-                    <i class="fas fa-user-circle"></i>
-                    Akun
+                <a href="{{ route('user.my-requests') }}" class="nav-item">
+                    <i class="fas fa-list"></i>
+                    Request Saya
                 </a>
             </nav>
         </div>
@@ -90,7 +90,7 @@
                 <div style="background: var(--white); padding: 2rem; border-radius: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border: 1px solid var(--border-color); margin-bottom: 2rem;">
                     <h3 style="margin-bottom: 1.5rem; color: var(--text-dark); font-size: 1.25rem; font-weight: 600;">Aksi Cepat</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                        <button style="
+                        <a href="{{ route('user.perpustakaan') }}" style="
                             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
                             color: white;
                             border: none;
@@ -100,12 +100,15 @@
                             font-size: 1rem;
                             font-weight: 600;
                             transition: all 0.2s;
+                            text-decoration: none;
+                            display: block;
+                            text-align: center;
                         " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
                             <i class="fas fa-play" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                             Mulai Belajar
-                        </button>
+                        </a>
                         
-                        <button style="
+                        <a href="javascript:void(0)" onclick="alert('Fitur sedang dalam pengembangan'); return false;" style="
                             background: var(--white);
                             color: var(--primary-color);
                             border: 2px solid var(--primary-color);
@@ -115,12 +118,15 @@
                             font-size: 1rem;
                             font-weight: 600;
                             transition: all 0.2s;
+                            text-decoration: none;
+                            display: block;
+                            text-align: center;
                         " onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'" onmouseout="this.style.background='var(--white)'; this.style.color='var(--primary-color)'">
                             <i class="fas fa-file-circle-plus" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
                             Request Materi
-                        </button>
+                        </a>
                         
-                        <button style="
+                        <a href="javascript:void(0)" onclick="alert('Fitur sedang dalam pengembangan'); return false;" style="
                             background: var(--white);
                             color: var(--primary-color);
                             border: 2px solid var(--primary-color);
@@ -130,10 +136,13 @@
                             font-size: 1rem;
                             font-weight: 600;
                             transition: all 0.2s;
+                            text-decoration: none;
+                            display: block;
+                            text-align: center;
                         " onmouseover="this.style.background='var(--primary-color)'; this.style.color='white'" onmouseout="this.style.background='var(--white)'; this.style.color='var(--primary-color)'">
-                            <i class="fas fa-book-open" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
-                            Buka Perpustakaan
-                        </button>
+                            <i class="fas fa-list" style="display: block; font-size: 1.5rem; margin-bottom: 0.5rem;"></i>
+                            Request Saya
+                        </a>
                     </div>
                 </div>
 
@@ -170,17 +179,8 @@
     <script>
         // Sidebar navigation handling
         document.addEventListener('DOMContentLoaded', function() {
-            const navItems = document.querySelectorAll('.nav-item');
-            
-            navItems.forEach(item => {
-                item.addEventListener('click', function(e) {
-                    if (this.getAttribute('href') === '#') {
-                        e.preventDefault();
-                        // Handle navigation untuk menu yang belum ada halaman
-                        alert('Fitur ini sedang dalam pengembangan');
-                    }
-                });
-            });
+            // Navigation is now handled by proper links
+            // No need for alert handling
         });
     </script>
 </body>

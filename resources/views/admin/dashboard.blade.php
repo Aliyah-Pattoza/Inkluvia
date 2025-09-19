@@ -76,10 +76,15 @@
             Manajemen Perangkat
         </button>
         
-        <button class="btn btn-secondary" style="justify-content: center; flex-direction: column; height: 120px; text-align: center;" onclick="alert('Fitur sedang dalam pengembangan')">
+        <a href="{{ route('admin.manajemen-materi') }}" class="btn btn-secondary" style="justify-content: center; flex-direction: column; height: 120px; text-align: center;">
             <i class="fas fa-braille" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
             Manajemen Materi
-        </button>
+        </a>
+        
+        <a href="{{ route('admin.request-materi') }}" class="btn btn-info" style="justify-content: center; flex-direction: column; height: 120px; text-align: center;">
+            <i class="fas fa-inbox" style="font-size: 2rem; margin-bottom: 0.5rem;"></i>
+            Request Materi
+        </a>
     </div>
 </div>
 
