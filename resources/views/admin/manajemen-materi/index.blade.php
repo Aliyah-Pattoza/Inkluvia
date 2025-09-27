@@ -75,6 +75,7 @@
                                 <th class="border-0 py-3 px-4 fw-bold text-dark">Tingkat</th>
                                 <th class="border-0 py-3 px-4 fw-bold text-dark">Status</th>
                                 <th class="border-0 py-3 px-4 fw-bold text-dark">Akses</th>
+                                <th class="border-0 py-3 px-4 fw-bold text-dark">Braille</th>
                                 <th class="border-0 py-3 px-4 fw-bold text-dark">Aksi</th>
                             </tr>
                         </thead>
@@ -113,6 +114,17 @@
                                         </span>
                                     </td>
                                     <td class="py-3 px-4">
+                                        @if($material->braille_data_path)
+                                            <button type="button" class="btn btn-sm btn-outline-info" 
+                                                    onclick="previewBraille({{ $material->id }})" 
+                                                    title="Lihat Braille" style="border-radius: 6px;">
+                                                <i class="fas fa-braille me-1"></i>Braille
+                                            </button>
+                                        @else
+                                            <span class="text-muted small">Belum tersedia</span>
+                                        @endif
+                                    </td>
+                                    <td class="py-3 px-4">
                                         <div class="d-flex gap-2">
                                             <!-- Read/Preview Button -->
                                             <button type="button" class="btn btn-sm btn-outline-primary" 
@@ -144,8 +156,52 @@
                 </div>
                 
                 <!-- Pagination -->
-                <div class="d-flex justify-content-center py-4">
-                    {{ $materials->links() }}
+                <div class="d-flex justify-content-between align-items-center py-3">
+                    <div class="text-muted">
+                        Showing {{ $materials->firstItem() }} to {{ $materials->lastItem() }} of {{ $materials->total() }} results
+                    </div>
+                    <div class="pagination-container">
+                        @if ($materials->hasPages())
+                            <nav aria-label="Page navigation">
+                                <ul class="pagination pagination-sm mb-0">
+                                    {{-- Previous Page Link --}}
+                                    @if ($materials->onFirstPage())
+                                        <li class="page-item disabled">
+                                            <span class="page-link">&laquo;</span>
+                                        </li>
+                                    @else
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ $materials->previousPageUrl() }}" rel="prev">&laquo;</a>
+                                        </li>
+                                    @endif
+
+                                    {{-- Pagination Elements --}}
+                                    @foreach ($materials->getUrlRange(1, $materials->lastPage()) as $page => $url)
+                                        @if ($page == $materials->currentPage())
+                                            <li class="page-item active">
+                                                <span class="page-link">{{ $page }}</span>
+                                            </li>
+                                        @else
+                                            <li class="page-item">
+                                                <a class="page-link" href="{{ $url }}">{{ $page }}</a>
+                                            </li>
+                                        @endif
+                                    @endforeach
+
+                                    {{-- Next Page Link --}}
+                                    @if ($materials->hasMorePages())
+                                        <li class="page-item">
+                                            <a class="page-link" href="{{ $materials->nextPageUrl() }}" rel="next">&raquo;</a>
+                                        </li>
+                                    @else
+                                        <li class="page-item disabled">
+                                            <span class="page-link">&raquo;</span>
+                                        </li>
+                                    @endif
+                                </ul>
+                            </nav>
+                        @endif
+                    </div>
                 </div>
             @else
                 <div class="text-center py-5">
@@ -187,6 +243,38 @@
                 </button>
                 <button type="button" class="btn btn-primary" id="downloadJsonBtn" style="border-radius: 8px;">
                     <i class="fas fa-download me-2"></i>Download JSON
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Braille Preview Modal -->
+<div class="modal fade" id="braillePreviewModal" tabindex="-1" aria-labelledby="braillePreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="border-radius: 12px;">
+            <div class="modal-header" style="background-color: #17a2b8; color: white; border-radius: 12px 12px 0 0;">
+                <h5 class="modal-title fw-bold" id="braillePreviewModalLabel">
+                    <i class="fas fa-braille me-2"></i>Preview Braille
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div id="brailleContent">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Memuat konten braille...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #e9ecef;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px;">
+                    <i class="fas fa-times me-2"></i>Tutup
+                </button>
+                <button type="button" class="btn btn-info" id="downloadBrailleBtn" style="border-radius: 8px;">
+                    <i class="fas fa-download me-2"></i>Download Braille
                 </button>
             </div>
         </div>
@@ -251,6 +339,108 @@
     background-color: #f8f9fa;
     border-radius: 4px;
     border-left: 3px solid #8B5CF6;
+}
+
+.braille-content {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.braille-page {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: white;
+    border-radius: 8px;
+    border-left: 4px solid #17a2b8;
+}
+
+.braille-page-header {
+    font-weight: bold;
+    color: #17a2b8;
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.braille-line {
+    margin: 5px 0;
+    padding: 5px 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #17a2b8;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    letter-spacing: 1px;
+}
+
+.braille-text-display {
+    font-family: 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 2px;
+    background-color: #e3f2fd;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #bbdefb;
+    display: inline-block;
+    margin: 2px;
+}
+
+/* Custom Pagination Styles */
+.pagination {
+    margin: 0;
+    background: none;
+    border: none;
+}
+
+.pagination .page-item {
+    background: none;
+    border: none;
+    margin: 0 2px;
+}
+
+.pagination .page-link {
+    color: #8B5CF6;
+    background: white;
+    border: 1px solid #e9ecef;
+    padding: 8px 12px;
+    font-size: 14px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    display: block;
+    min-width: 40px;
+    text-align: center;
+}
+
+.pagination .page-link:hover {
+    background-color: #8B5CF6;
+    color: white;
+    border-color: #8B5CF6;
+    text-decoration: none;
+}
+
+.pagination .page-item.active .page-link {
+    background-color: #8B5CF6;
+    border-color: #8B5CF6;
+    color: white;
+}
+
+.pagination .page-item.disabled .page-link {
+    color: #6c757d;
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+    cursor: not-allowed;
+}
+
+.pagination-container {
+    display: flex;
+    align-items: center;
 }
 </style>
 
@@ -348,30 +538,6 @@ function displayMaterialPreview(data) {
         html += JSON.stringify(data, null, 2);
         html += '</pre>';
         html += '</div>';
-        
-        // Pages content
-        html += '<div class="mb-4">';
-        html += '<h6 class="mb-3"><i class="fas fa-braille me-2"></i>Konten Braille Preview</h6>';
-        
-        data.pages.forEach((page, index) => {
-            html += `<div class="page-content">`;
-            html += `<div class="page-header">Halaman ${page.page}</div>`;
-            
-            if (page.lines && page.lines.length > 0) {
-                page.lines.forEach(line => {
-                    html += `<div class="line-content">`;
-                    html += `<span class="text-muted me-2">${line.line}.</span>`;
-                    html += `<span>${line.text}</span>`;
-                    html += `</div>`;
-                });
-            } else {
-                html += '<div class="text-muted">Tidak ada konten pada halaman ini</div>';
-            }
-            
-            html += '</div>';
-        });
-        
-        html += '</div>';
         html += '</div>';
     } else {
         html = `
@@ -390,6 +556,78 @@ function displayMaterialPreview(data) {
 document.getElementById('downloadJsonBtn').addEventListener('click', function() {
     if (currentMaterialId) {
         window.open(`/admin/manajemen-materi/${currentMaterialId}/download-json`, '_blank');
+    }
+});
+
+// Braille preview functionality
+let currentBrailleMaterialId = null;
+
+function previewBraille(materialId) {
+    console.log('Preview braille called with ID:', materialId);
+    currentBrailleMaterialId = materialId;
+    
+    // Check if Bootstrap is available
+    if (typeof bootstrap === 'undefined') {
+        alert('Bootstrap tidak tersedia. Silakan refresh halaman.');
+        return;
+    }
+    
+    const modalElement = document.getElementById('braillePreviewModal');
+    if (!modalElement) {
+        alert('Modal braille tidak ditemukan.');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+    
+    // Reset content
+    document.getElementById('brailleContent').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-info" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-3 text-muted">Memuat konten braille...</p>
+        </div>
+    `;
+    
+    // Fetch braille content
+    fetch(`/admin/manajemen-materi/${materialId}/braille-content`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            displayBrailleContent(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('brailleContent').innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                    <h5 class="text-warning mb-2">Gagal memuat braille</h5>
+                    <p class="text-muted">${error.message || 'Terjadi kesalahan saat memuat konten braille'}</p>
+                </div>
+            `;
+        });
+}
+
+function displayBrailleContent(data) {
+    // Display pure JSON
+    const jsonString = JSON.stringify(data, null, 2);
+    const html = `<pre class="bg-light p-3 rounded" style="max-height: 400px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px;">${jsonString}</pre>`;
+    document.getElementById('brailleContent').innerHTML = html;
+}
+
+// Download Braille functionality
+document.getElementById('downloadBrailleBtn').addEventListener('click', function() {
+    if (currentBrailleMaterialId) {
+        window.open(`/admin/manajemen-materi/${currentBrailleMaterialId}/download-braille`, '_blank');
     }
 });
 
@@ -451,6 +689,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
 
 // Helper function to show alerts
 function showAlert(message, type) {

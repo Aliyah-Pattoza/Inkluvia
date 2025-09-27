@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Material;
 use App\Models\BrailleContent;
+use App\Models\MaterialBrailleContent;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -32,11 +33,11 @@ class PdfConversionService
         try {
             Log::info("Starting PDF to Braille conversion for material ID: {$material->id}");
 
-            // Step 1: Extract text from PDF using your Python script
-            $jsonData = $this->extractTextFromPdf($material->file_path);
+            // Step 1: Read existing JSON data (created by PdfToJsonService)
+            $jsonData = $this->readJsonData($material->file_path);
             
             if (!$jsonData) {
-                throw new Exception('Failed to extract text from PDF');
+                throw new Exception('Failed to read JSON data from file: ' . $material->file_path);
             }
 
             // Step 2: Convert text to Braille
@@ -46,9 +47,10 @@ class PdfConversionService
             $brailleDataPath = $this->saveBrailleContent($material, $brailleContent);
 
             // Step 4: Update material record
+            $pageCount = isset($brailleContent['pages']) ? count($brailleContent['pages']) : count($brailleContent);
             $material->update([
                 'braille_data_path' => $brailleDataPath,
-                'total_halaman' => count($brailleContent),
+                'total_halaman' => $pageCount,
                 'status' => 'review' // Ready for review
             ]);
 
@@ -67,33 +69,19 @@ class PdfConversionService
     }
 
     /**
-     * Extract text from PDF using your Python script
+     * Read existing JSON data from file
      */
-    private function extractTextFromPdf($filePath)
+    private function readJsonData($filePath)
     {
-        $fullPath = Storage::disk('private')->path($filePath);
-        
-        // Check if Python script exists
-        if (!file_exists($this->pythonScriptPath)) {
-            throw new Exception('PDF converter script not found. Please add your Python script to: ' . $this->pythonScriptPath);
+        if (!Storage::disk('private')->exists($filePath)) {
+            throw new Exception('JSON file not found: ' . $filePath);
         }
 
-        // Execute Python script
-        $command = "python3 " . escapeshellarg($this->pythonScriptPath) . " " . escapeshellarg($fullPath) . " 2>&1";
-        
-        Log::info("Executing command: " . $command);
-        
-        $output = shell_exec($command);
-        
-        if (!$output) {
-            throw new Exception('Python script execution failed');
-        }
-
-        // Parse JSON output
-        $jsonData = json_decode($output, true);
+        $jsonContent = Storage::disk('private')->get($filePath);
+        $jsonData = json_decode($jsonContent, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception('Invalid JSON output from Python script: ' . json_last_error_msg());
+            throw new Exception('Invalid JSON file: ' . json_last_error_msg());
         }
 
         return $jsonData;
@@ -104,23 +92,56 @@ class PdfConversionService
      */
     private function convertTextToBraille($jsonData)
     {
-        $brailleContent = [];
-        
-        // This is a placeholder for Braille conversion
-        // You'll need to implement actual Braille conversion logic here
-        // or integrate with a Braille conversion service
-        
-        foreach ($jsonData as $pageIndex => $pageData) {
-            $pageContent = $this->convertPageToBraille($pageData);
-            $brailleContent[] = [
-                'page_number' => (int)$pageIndex + 1,
-                'content' => $pageContent,
-                'original_text' => $pageData['text'] ?? '',
-                'metadata' => $pageData['metadata'] ?? []
+        // Return the full JSON structure with braille content
+        if (isset($jsonData['pages']) && is_array($jsonData['pages'])) {
+            $brailleJson = [
+                'judul' => $this->placeholderBrailleConversion($jsonData['judul'] ?? ''),
+                'penerbit' => $this->placeholderBrailleConversion($jsonData['penerbit'] ?? ''),
+                'tahun' => $this->placeholderBrailleConversion($jsonData['tahun'] ?? ''),
+                'edisi' => $this->placeholderBrailleConversion($jsonData['edisi'] ?? ''),
+                'pages' => []
             ];
+            
+            foreach ($jsonData['pages'] as $pageData) {
+                $braillePage = $this->convertPageToBraille($pageData);
+                $brailleJson['pages'][] = $braillePage;
+            }
+            
+            return $brailleJson;
+        } else {
+            // Fallback for old structure
+            $brailleContent = [];
+            foreach ($jsonData as $pageIndex => $pageData) {
+                $pageContent = $this->convertPageToBraille($pageData);
+                $brailleContent[] = [
+                    'page_number' => (int)$pageIndex + 1,
+                    'content' => $pageContent,
+                    'original_text' => $pageData['text'] ?? '',
+                    'metadata' => $pageData['metadata'] ?? []
+                ];
+            }
+            return $brailleContent;
         }
+    }
 
-        return $brailleContent;
+    /**
+     * Extract text from page data structure
+     */
+    private function extractTextFromPage($pageData)
+    {
+        $text = '';
+        
+        if (isset($pageData['lines']) && is_array($pageData['lines'])) {
+            foreach ($pageData['lines'] as $line) {
+                if (isset($line['text'])) {
+                    $text .= $line['text'] . "\n";
+                }
+            }
+        } elseif (isset($pageData['text'])) {
+            $text = $pageData['text'];
+        }
+        
+        return trim($text);
     }
 
     /**
@@ -128,21 +149,24 @@ class PdfConversionService
      */
     private function convertPageToBraille($pageData)
     {
-        // Placeholder Braille conversion
-        // Replace this with actual Braille conversion logic
-        
-        $text = $pageData['text'] ?? '';
-        
-        // Simple placeholder conversion (this is NOT real Braille)
-        // You should replace this with proper Braille conversion
-        $brailleText = $this->placeholderBrailleConversion($text);
-        
-        return [
-            'braille_text' => $brailleText,
-            'line_count' => substr_count($brailleText, "\n") + 1,
-            'character_count' => strlen($brailleText),
-            'conversion_timestamp' => now()->toISOString()
+        $braillePage = [
+            'page' => $pageData['page'] ?? 1,
+            'lines' => []
         ];
+        
+        if (isset($pageData['lines']) && is_array($pageData['lines'])) {
+            foreach ($pageData['lines'] as $index => $line) {
+                if (isset($line['text']) && !empty(trim($line['text']))) {
+                    $brailleText = $this->placeholderBrailleConversion($line['text']);
+                    $braillePage['lines'][] = [
+                        'line' => $index + 1,
+                        'text' => $brailleText
+                    ];
+                }
+            }
+        }
+        
+        return $braillePage;
     }
 
     /**
@@ -153,6 +177,13 @@ class PdfConversionService
     {
         // This is just a placeholder - NOT actual Braille conversion
         // You need to implement real Braille conversion here
+        
+        // Convert to string if it's not already
+        $text = (string) $text;
+        
+        if (empty($text)) {
+            return '';
+        }
         
         $brailleMap = [
             'a' => '⠁', 'b' => '⠃', 'c' => '⠉', 'd' => '⠙', 'e' => '⠑',
@@ -179,17 +210,51 @@ class PdfConversionService
      */
     private function saveBrailleContent(Material $material, $brailleContent)
     {
-        // Save to database
-        foreach ($brailleContent as $pageData) {
-            BrailleContent::create([
-                'material_id' => $material->id,
-                'page_number' => $pageData['page_number'],
-                'braille_text' => $pageData['content']['braille_text'],
-                'original_text' => $pageData['original_text'],
-                'metadata' => json_encode($pageData['metadata']),
-                'line_count' => $pageData['content']['line_count'],
-                'character_count' => $pageData['content']['character_count']
-            ]);
+        // Handle new JSON structure
+        if (isset($brailleContent['pages']) && is_array($brailleContent['pages'])) {
+            // New structure with full JSON
+            foreach ($brailleContent['pages'] as $pageData) {
+                $brailleText = '';
+                $originalText = '';
+                $lineCount = 0;
+                $characterCount = 0;
+                
+                if (isset($pageData['lines']) && is_array($pageData['lines'])) {
+                    foreach ($pageData['lines'] as $line) {
+                        $brailleText .= $line['text'] . "\n";
+                        $characterCount += strlen($line['text']);
+                    }
+                    $lineCount = count($pageData['lines']);
+                }
+                
+                MaterialBrailleContent::create([
+                    'material_id' => $material->id,
+                    'page_number' => $pageData['page'] ?? 1,
+                    'braille_text' => trim($brailleText),
+                    'original_text' => $originalText,
+                    'metadata' => [
+                        'judul' => $brailleContent['judul'] ?? '',
+                        'penerbit' => $brailleContent['penerbit'] ?? '',
+                        'tahun' => $brailleContent['tahun'] ?? '',
+                        'edisi' => $brailleContent['edisi'] ?? ''
+                    ],
+                    'line_count' => $lineCount,
+                    'character_count' => $characterCount
+                ]);
+            }
+        } else {
+            // Old structure fallback
+            foreach ($brailleContent as $pageData) {
+                MaterialBrailleContent::create([
+                    'material_id' => $material->id,
+                    'page_number' => $pageData['page_number'],
+                    'braille_text' => $pageData['content']['braille_text'],
+                    'original_text' => $pageData['original_text'],
+                    'metadata' => $pageData['metadata'],
+                    'line_count' => $pageData['content']['line_count'],
+                    'character_count' => $pageData['content']['character_count']
+                ]);
+            }
         }
 
         // Save to file
@@ -206,7 +271,7 @@ class PdfConversionService
      */
     public function getConversionStatus(Material $material)
     {
-        $brailleContents = BrailleContent::where('material_id', $material->id)->get();
+        $brailleContents = MaterialBrailleContent::where('material_id', $material->id)->get();
         
         return [
             'total_pages' => $brailleContents->count(),
@@ -222,7 +287,7 @@ class PdfConversionService
     public function reconvert(Material $material)
     {
         // Delete existing Braille content
-        BrailleContent::where('material_id', $material->id)->delete();
+        MaterialBrailleContent::where('material_id', $material->id)->delete();
         
         if ($material->braille_data_path) {
             Storage::disk('private')->delete($material->braille_data_path);

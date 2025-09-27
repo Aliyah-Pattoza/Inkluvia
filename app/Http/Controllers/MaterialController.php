@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Material;
 use App\Models\MaterialRequest;
 use App\Models\BrailleContent;
+use App\Models\MaterialBrailleContent;
 use App\Services\PdfConversionService;
 use App\Services\PdfToJsonService;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ class MaterialController extends Controller
             'edisi' => 'nullable|string|max:100',
             'kategori' => 'nullable|string',
             'tingkat' => 'required|string',
-            'file' => 'required|file|mimes:pdf|max:10240', // 10MB max
+            'file' => 'required|file|mimes:pdf|max:40960', // 40MB max
             'akses' => 'required'
         ]);
         
@@ -439,6 +440,18 @@ class MaterialController extends Controller
                 }
                 
                 \Log::info("PDF conversion completed for material {$material->id}. PDF deleted, JSON saved.");
+                
+                // Now convert JSON to Braille
+                $conversionService = new PdfConversionService();
+                $brailleResult = $conversionService->convertPdfToBraille($material);
+                
+                if ($brailleResult) {
+                    \Log::info("Braille conversion completed for material {$material->id}");
+                    $material->update(['status' => 'review']);
+                } else {
+                    \Log::warning("Braille conversion failed for material {$material->id}");
+                    $material->update(['status' => 'review']); // Still mark as review since JSON is available
+                }
             } else {
                 throw new \Exception('PDF conversion returned no data');
             }
@@ -476,6 +489,118 @@ class MaterialController extends Controller
         }
         
         return Storage::disk('private')->download($material->file_path, $material->judul . '.pdf');
+    }
+
+    /**
+     * Get Braille content for preview
+     */
+    public function getBrailleContent(Material $material)
+    {
+        try {
+            // Check access permissions
+            $this->checkMaterialAccess($material);
+            
+            // Get braille content from database
+            $brailleContents = MaterialBrailleContent::where('material_id', $material->id)
+                ->orderBy('page_number')
+                ->get();
+            
+            if ($brailleContents->isEmpty()) {
+                return response()->json([
+                    'error' => 'Tidak ada konten braille tersedia untuk materi ini'
+                ], 404);
+            }
+            
+            // Get metadata from JSON file (not database)
+            $jsonContent = Storage::disk('private')->get($material->file_path);
+            $jsonData = json_decode($jsonContent, true);
+            
+            // Build JSON structure with braille-converted metadata from JSON file
+            $brailleJson = [
+                'judul' => $this->convertToBraille($jsonData['judul'] ?? ''),
+                'penerbit' => $this->convertToBraille($jsonData['penerbit'] ?? ''),
+                'tahun' => $this->convertToBraille($jsonData['tahun'] ?? ''),
+                'edisi' => $this->convertToBraille($jsonData['edisi'] ?? ''),
+                'pages' => []
+            ];
+            
+            // Group by page number and build lines
+            $pages = [];
+            foreach ($brailleContents as $content) {
+                $pageNumber = $content->page_number;
+                if (!isset($pages[$pageNumber])) {
+                    $pages[$pageNumber] = [
+                        'page' => $pageNumber,
+                        'lines' => []
+                    ];
+                }
+                
+                // Split braille text into lines
+                $lines = explode("\n", $content->braille_text);
+                foreach ($lines as $index => $line) {
+                    if (!empty(trim($line))) {
+                        $pages[$pageNumber]['lines'][] = [
+                            'line' => count($pages[$pageNumber]['lines']) + 1,
+                            'text' => $line
+                        ];
+                    }
+                }
+            }
+            
+            // Convert to array and sort by page number
+            $brailleJson['pages'] = array_values($pages);
+            
+            return response()->json($brailleJson);
+            
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Gagal memuat konten braille: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Convert text to braille
+     */
+    private function convertToBraille($text)
+    {
+        if (empty($text)) {
+            return '';
+        }
+
+        $brailleMap = [
+            'a' => '⠁', 'b' => '⠃', 'c' => '⠉', 'd' => '⠙', 'e' => '⠑',
+            'f' => '⠋', 'g' => '⠛', 'h' => '⠓', 'i' => '⠊', 'j' => '⠚',
+            'k' => '⠅', 'l' => '⠇', 'm' => '⠍', 'n' => '⠝', 'o' => '⠕',
+            'p' => '⠏', 'q' => '⠟', 'r' => '⠗', 's' => '⠎', 't' => '⠞',
+            'u' => '⠥', 'v' => '⠧', 'w' => '⠺', 'x' => '⠭', 'y' => '⠽', 'z' => '⠵',
+            ' ' => '⠀', // Braille space
+            '1' => '⠁', '2' => '⠃', '3' => '⠉', '4' => '⠙', '5' => '⠑',
+            '6' => '⠋', '7' => '⠛', '8' => '⠓', '9' => '⠊', '0' => '⠚',
+            ',' => '⠂', // Comma
+            '.' => '⠲', // Period
+            ':' => '⠂⠂', // Colon
+            ';' => '⠂⠂', // Semicolon
+            '!' => '⠂⠂', // Exclamation
+            '?' => '⠂⠂', // Question mark
+            '-' => '⠤', // Hyphen
+            '(' => '⠐⠣', // Opening parenthesis
+            ')' => '⠐⠜', // Closing parenthesis
+            '[' => '⠐⠣', // Opening bracket
+            ']' => '⠐⠜', // Closing bracket
+            '"' => '⠐⠦', // Opening quote
+            '"' => '⠐⠴', // Closing quote
+            "'" => '⠐⠦', // Apostrophe
+            "'" => '⠐⠴', // Closing apostrophe
+        ];
+
+        $result = '';
+        for ($i = 0; $i < strlen($text); $i++) {
+            $char = strtolower($text[$i]);
+            $result .= $brailleMap[$char] ?? '⠿'; // Unknown character symbol
+        }
+
+        return $result;
     }
 
     /**
@@ -615,6 +740,84 @@ class MaterialController extends Controller
         } catch (\Exception $e) {
             \Log::error('Preview conversion error: ' . $e->getMessage());
             return response()->json(['error' => 'Gagal mengkonversi PDF: ' . $e->getMessage()], 500);
+        }
+    }
+    
+    /**
+     * User preview - returns HTML view instead of JSON
+     */
+    public function userPreview(Material $material)
+    {
+        try {
+            // Check if JSON file exists
+            if (!$material->file_path || !Storage::disk('private')->exists($material->file_path)) {
+                return view('user.material-preview', [
+                    'material' => $material,
+                    'error' => 'File JSON tidak ditemukan untuk materi ini'
+                ]);
+            }
+
+            // Read the saved JSON file directly
+            try {
+                $jsonContent = Storage::disk('private')->get($material->file_path);
+                $jsonData = json_decode($jsonContent, true);
+                
+                if ($jsonData && isset($jsonData['pages']) && !empty($jsonData['pages'])) {
+                    return view('user.material-preview', [
+                        'material' => $material,
+                        'jsonData' => $jsonData
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \Log::error('Failed to read JSON file: ' . $e->getMessage());
+            }
+
+            // Fallback: Return basic material info if PDF conversion fails
+            $jsonData = [
+                'judul' => $material->judul,
+                'penerbit' => $material->penerbit,
+                'tahun' => $material->tahun_terbit,
+                'edisi' => $material->edisi,
+                'pages' => [
+                    [
+                        'page' => 1,
+                        'lines' => [
+                            [
+                                'line' => 1,
+                                'text' => 'PDF conversion failed. Material info:'
+                            ],
+                            [
+                                'line' => 2,
+                                'text' => 'Judul: ' . $material->judul
+                            ],
+                            [
+                                'line' => 3,
+                                'text' => 'Kategori: ' . ($material->kategori ?? 'Tidak ada')
+                            ],
+                            [
+                                'line' => 4,
+                                'text' => 'Tingkat: ' . ($material->tingkat ?? 'Tidak ada')
+                            ],
+                            [
+                                'line' => 5,
+                                'text' => 'Status: ' . ($material->status ?? 'Tidak ada')
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+            
+            return view('user.material-preview', [
+                'material' => $material,
+                'jsonData' => $jsonData
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('User preview error: ' . $e->getMessage());
+            return view('user.material-preview', [
+                'material' => $material,
+                'error' => 'Gagal memuat preview: ' . $e->getMessage()
+            ]);
         }
     }
 }

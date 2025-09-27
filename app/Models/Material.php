@@ -43,7 +43,7 @@ class Material extends Model
 
     public function brailleContents()
     {
-        return $this->hasMany(BrailleContent::class);
+        return $this->hasMany(MaterialBrailleContent::class);
     }
 
     public function getStatusBadgeColorAttribute()

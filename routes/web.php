@@ -40,7 +40,7 @@ Route::middleware('auth')->group(function () {
         
         // Material library
         Route::get('/perpustakaan', [MaterialController::class, 'library'])->name('perpustakaan');
-        Route::get('/materials/{material}/preview', [MaterialController::class, 'preview'])->name('materials.preview');
+        Route::get('/materials/{material}/preview', [MaterialController::class, 'userPreview'])->name('materials.preview');
         Route::get('/materials/{material}/download', [MaterialController::class, 'download'])->name('materials.download');
         Route::get('/materials/{material}/download-braille', [MaterialController::class, 'downloadBraille'])->name('materials.download-braille');
     });
@@ -69,6 +69,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/manajemen-materi', [MaterialController::class, 'store'])->name('manajemen-materi.store');
         Route::get('/manajemen-materi/{material}', [MaterialController::class, 'show'])->name('manajemen-materi.show');
         Route::get('/manajemen-materi/{material}/braille', [MaterialController::class, 'showWithBraille'])->name('manajemen-materi.braille');
+        Route::get('/manajemen-materi/{material}/braille-content', [MaterialController::class, 'getBrailleContent'])->name('manajemen-materi.braille-content');
         Route::get('/manajemen-materi/{material}/edit', [MaterialController::class, 'edit'])->name('manajemen-materi.edit');
         Route::put('/manajemen-materi/{material}', [MaterialController::class, 'update'])->name('manajemen-materi.update');
         Route::delete('/manajemen-materi/{material}', [MaterialController::class, 'destroy'])->name('manajemen-materi.destroy');
