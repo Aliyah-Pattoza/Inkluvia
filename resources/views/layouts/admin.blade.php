@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title') - Inkluvia</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('css/tailwind.css') }}">
     @stack('styles')
 </head>
@@ -30,13 +32,17 @@
                     <i class="fas fa-building"></i>
                     Manajemen Lembaga
                 </a>
-                <a href="#" class="nav-item" onclick="alert('Fitur sedang dalam pengembangan')">
+                <a href="{{ route('admin.kelola-perangkat') }}" class="nav-item {{ request()->routeIs('admin.kelola-perangkat*') ? 'active' : '' }}">
                     <i class="fas fa-laptop"></i>
                     Manajemen Device
                 </a>
-                <a href="#" class="nav-item" onclick="alert('Fitur sedang dalam pengembangan')">
+                <a href="{{ route('admin.manajemen-materi') }}" class="nav-item {{ request()->routeIs('admin.manajemen-materi*') ? 'active' : '' }}">
                     <i class="fas fa-braille"></i>
                     Manajemen Materi
+                </a>
+                <a href="{{ route('admin.request-materi') }}" class="nav-item {{ request()->routeIs('admin.request-materi*') ? 'active' : '' }}">
+                    <i class="fas fa-inbox"></i>
+                    Request Materi
                 </a>
                 <a href="#" class="nav-item" onclick="alert('Fitur sedang dalam pengembangan')">
                     <i class="fas fa-cogs"></i>
@@ -177,6 +183,7 @@
         });
     </script>
     
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     @stack('scripts')
 </body>
 </html>

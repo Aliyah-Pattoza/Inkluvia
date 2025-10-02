@@ -25,5 +25,27 @@ class DatabaseSeeder extends Seeder
             'lembaga_id' => 1, 
             'role' => 'admin'
         ]);
+
+        User::create([
+            'name' => 'Budi Santoso',
+            'email' => 'budisantoso@gmail.com',
+            'password' => Hash::make('budisantoso'),
+            'nama_lengkap' => 'Budi Santoso',
+            'tanggal_lahir' => '1990-01-01',
+            'jenis_kelamin' => 'Laki-laki',
+            'lembaga_id' => 1, 
+            'role' => 'user'
+        ]);
+
+        User::create([
+            'name' => 'Ahmad Fauzan',
+            'email' => 'ahmadfauzan@gmail.com',
+            'password' => Hash::make('ahmadfauzan'),
+            'nama_lengkap' => 'Ahmad Fauzan',
+            'tanggal_lahir' => '2001-10-11',
+            'jenis_kelamin' => 'Laki-laki',
+            'lembaga_id' => 3, 
+            'role' => 'user'
+        ]);
     }
 }

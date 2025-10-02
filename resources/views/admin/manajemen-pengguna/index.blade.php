@@ -149,7 +149,7 @@
                         {{ ucfirst($user->role) }}
                     </span>
                 </td>
-                <td>{{ $user->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}</td>
+                <td>{{ $user->jenis_kelamin === 'Laki-laki' ? 'Laki-laki' : 'Perempuan' }}</td>
                 <td>{{ $user->created_at->format('d/m/Y') }}</td>
                 <td>
                     <div style="display: flex; gap: 0.5rem;">

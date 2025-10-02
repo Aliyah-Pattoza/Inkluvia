@@ -6,7 +6,7 @@
     <meta name="description" content="Inkluvia adalah platform pendidikan inklusif berbasis web untuk tunanetra">
     <title>@yield('title', 'Inkluvia - Platform Edukasi Inklusif')</title>
     <link rel="icon" href="{{ asset('assets/icon.png') }}">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @vite(['public/css/app.css', 'public/js/app.js'])
 </head>
 <body class="bg-gray-50 min-h-screen">
     @yield('content')

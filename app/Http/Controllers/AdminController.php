@@ -62,7 +62,7 @@ class AdminController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:8',
             'role' => 'required|in:admin,user',
-            'jenis_kelamin' => 'required|in:L,P',
+            'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
             'tanggal_lahir' => 'required|date',
             'lembaga_id' => 'nullable|exists:lembagas,id'
         ]);
@@ -88,7 +88,7 @@ class AdminController extends Controller
             'nama_lengkap' => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'role' => 'required|in:admin,user',
-            'jenis_kelamin' => 'required|in:L,P',
+            'jenis_kelamin' => 'required|in:Laki-laki,Perempuan',
             'tanggal_lahir' => 'required|date',
             'lembaga_id' => 'nullable|exists:lembagas,id',
             'password' => 'nullable|min:8'
