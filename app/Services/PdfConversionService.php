@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Material;
 use App\Models\BrailleContent;
 use App\Models\MaterialBrailleContent;
+use App\Services\BrailleConverter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -13,11 +14,13 @@ class PdfConversionService
 {
     private $pythonScriptPath;
     private $tempDir;
+    private $brailleConverter;
 
     public function __construct()
     {
         $this->pythonScriptPath = app_path('Services/pdf_converter.py');
         $this->tempDir = storage_path('app/temp');
+        $this->brailleConverter = new BrailleConverter();
         
         // Ensure temp directory exists
         if (!file_exists($this->tempDir)) {
@@ -95,10 +98,10 @@ class PdfConversionService
         // Return the full JSON structure with braille content
         if (isset($jsonData['pages']) && is_array($jsonData['pages'])) {
             $brailleJson = [
-                'judul' => $this->placeholderBrailleConversion($jsonData['judul'] ?? ''),
-                'penerbit' => $this->placeholderBrailleConversion($jsonData['penerbit'] ?? ''),
-                'tahun' => $this->placeholderBrailleConversion($jsonData['tahun'] ?? ''),
-                'edisi' => $this->placeholderBrailleConversion($jsonData['edisi'] ?? ''),
+                'judul' => $this->convertLineToBraille($jsonData['judul'] ?? ''),
+                'penerbit' => $this->convertLineToBraille($jsonData['penerbit'] ?? ''),
+                'tahun' => $this->convertLineToBraille($jsonData['tahun'] ?? ''),
+                'edisi' => $this->convertLineToBraille($jsonData['edisi'] ?? ''),
                 'pages' => []
             ];
             
@@ -157,7 +160,7 @@ class PdfConversionService
         if (isset($pageData['lines']) && is_array($pageData['lines'])) {
             foreach ($pageData['lines'] as $index => $line) {
                 if (isset($line['text']) && !empty(trim($line['text']))) {
-                    $brailleText = $this->placeholderBrailleConversion($line['text']);
+                    $brailleText = $this->convertLineToBraille($line['text']);
                     $braillePage['lines'][] = [
                         'line' => $index + 1,
                         'text' => $brailleText
@@ -170,39 +173,111 @@ class PdfConversionService
     }
 
     /**
-     * Placeholder Braille conversion (NOT real Braille)
-     * Replace this with actual Braille conversion logic
+     * Convert single line of text to Braille using the BrailleConverter
      */
-    private function placeholderBrailleConversion($text)
+    private function convertLineToBraille($text)
     {
-        // This is just a placeholder - NOT actual Braille conversion
-        // You need to implement real Braille conversion here
+        // Preprocess mathematical content
+        $text = $this->preprocessMathContent($text);
         
-        // Convert to string if it's not already
-        $text = (string) $text;
+        return $this->brailleConverter->convertLine($text);
+    }
+
+    /**
+     * Preprocess mathematical content for better conversion
+     */
+    private function preprocessMathContent($text)
+    {
+        // Normalize mathematical symbols
+        $text = $this->normalizeMathSymbols($text);
         
-        if (empty($text)) {
-            return '';
-        }
+        // Handle mathematical expressions
+        $text = $this->handleMathExpressions($text);
         
-        $brailleMap = [
-            'a' => '⠁', 'b' => '⠃', 'c' => '⠉', 'd' => '⠙', 'e' => '⠑',
-            'f' => '⠋', 'g' => '⠛', 'h' => '⠓', 'i' => '⠊', 'j' => '⠚',
-            'k' => '⠅', 'l' => '⠇', 'm' => '⠍', 'n' => '⠝', 'o' => '⠕',
-            'p' => '⠏', 'q' => '⠟', 'r' => '⠗', 's' => '⠎', 't' => '⠞',
-            'u' => '⠥', 'v' => '⠧', 'w' => '⠺', 'x' => '⠭', 'y' => '⠽', 'z' => '⠵',
-            ' ' => '⠀', // Braille space
-            '1' => '⠂', '2' => '⠆', '3' => '⠒', '4' => '⠲', '5' => '⠢',
-            '6' => '⠖', '7' => '⠶', '8' => '⠦', '9' => '⠔', '0' => '⠴'
+        // Clean up spacing around mathematical symbols
+        $text = $this->cleanMathSpacing($text);
+        
+        return $text;
+    }
+
+    /**
+     * Normalize mathematical symbols to standard Unicode
+     */
+    private function normalizeMathSymbols($text)
+    {
+        $normalizations = [
+            // Common ASCII alternatives to proper mathematical symbols
+            '!=' => '≠',
+            '<=' => '≤',
+            '>=' => '≥',
+            '~=' => '≈',
+            '+-' => '±',
+            '-+' => '∓',
+            '*' => '×', // when used as multiplication
+            '/' => '÷', // when used as division
+            '^' => '^', // keep as is for exponents
+            'sqrt' => '√',
+            'inf' => '∞',
+            'pi' => 'π',
+            'alpha' => 'α',
+            'beta' => 'β',
+            'gamma' => 'γ',
+            'delta' => 'δ',
+            'epsilon' => 'ε',
+            'theta' => 'θ',
+            'lambda' => 'λ',
+            'mu' => 'μ',
+            'sigma' => 'σ',
+            'phi' => 'φ',
+            'omega' => 'ω',
         ];
-
-        $result = '';
-        for ($i = 0; $i < strlen($text); $i++) {
-            $char = strtolower($text[$i]);
-            $result .= $brailleMap[$char] ?? '⠿'; // Unknown character symbol
+        
+        foreach ($normalizations as $ascii => $unicode) {
+            $text = str_replace($ascii, $unicode, $text);
         }
+        
+        return $text;
+    }
 
-        return $result;
+    /**
+     * Handle mathematical expressions and equations
+     */
+    private function handleMathExpressions($text)
+    {
+        // Handle common mathematical patterns
+        
+        // Fractions: a/b -> a÷b
+        $text = preg_replace('/(\w+)\/(\w+)/u', '$1÷$2', $text);
+        
+        // Powers: x^2 -> x^2 (keep as is)
+        // This is already handled by the BrailleConverter
+        
+        // Square roots: sqrt(x) -> √x
+        $text = preg_replace('/sqrt\s*\(([^)]+)\)/u', '√$1', $text);
+        
+        // Mathematical functions
+        $functions = ['sin', 'cos', 'tan', 'log', 'ln', 'exp', 'abs', 'max', 'min', 'lim', 'sum', 'prod', 'int'];
+        foreach ($functions as $func) {
+            $text = preg_replace('/\b' . $func . '\s*\(/u', $func . '(', $text);
+        }
+        
+        return $text;
+    }
+
+    /**
+     * Clean up spacing around mathematical symbols
+     */
+    private function cleanMathSpacing($text)
+    {
+        // Remove extra spaces around mathematical operators
+        $text = preg_replace('/\s*([+\-×÷=<>≤≥≠±∓])\s*/u', '$1', $text);
+        
+        // Ensure proper spacing around comparison operators
+        $text = preg_replace('/([^=])(=)([^=])/u', '$1 $2 $3', $text);
+        $text = preg_replace('/([^<])([<≥≤])([^=])/u', '$1 $2 $3', $text);
+        $text = preg_replace('/([^>])([>≤≥])([^=])/u', '$1 $2 $3', $text);
+        
+        return $text;
     }
 
     /**
@@ -304,3 +379,4 @@ class PdfConversionService
         return $this->convertPdfToBraille($material);
     }
 }
+
